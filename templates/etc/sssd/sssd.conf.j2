@@ -1,0 +1,30 @@
+{% if potos_sssd_integration is defined %}
+{% if potos_sssd_integration == 'ldap' %}
+[sssd]
+config_file_version = 2
+domains = LDAP
+
+[domain/LDAP]
+id_provider = ldap
+auth_provider = ldap
+chpass_provider = ldap
+cache_credentials = True
+
+ldap_uri = {{ potos_sssd_ldap.uri }}
+ldap_tls_reqcert = demand
+ldap_search_base = {{ potos_sssd_ldap.search_base }}
+ldap_default_bind_dn = {{ potos_sssd_ldap.default_bind_dn }}
+ldap_default_authtok = {{ potos_sssd_ldap.default_authtok }}
+ldap_schema = rfc2307bis
+ldap_group_member = uniqueMember
+
+{% if potos_sssd_ldap.access_provider_simple_allow_groups is defined %}
+access_provider = simple
+simple_allow_groups = {{ potos_sssd_ldap.access_provider_simple_allow_groups }}
+{% endif %}
+{% else %}
+# potos_sssd_integration set to {{ potos_sssd_integration }}, don't know what to do
+{% endif %}
+{% else %}
+# potos_sssd_integration unset, doing nothing
+{% endif %}
