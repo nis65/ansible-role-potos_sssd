@@ -1,9 +1,45 @@
 ---
 
-- name: Example task to deploy a template
+- name: add sssd-tools and libpam-mount
+  ansible.builtin.apt:
+    name:
+      - sssd-tools
+      - libpam-mount
+      - ca-certificates
+    state: present
+
+- name: download ca cert
+  ansible.builtin.get_url:
+    url: "{{ potos_sssd_ca_cert_url }}"
+    dest: /usr/local/share/ca-certificates/potos-sssd-ldap-ca.crt
+  notify: update ca store
+
+- name: configure sssd
   ansible.builtin.template:
-    src: 'potos.example.j2'
-    dest: '/potos.example'
-    owner: root
-    group: root
-    mode: '0755'
+    force: "{{ potos_sssd_force_template }}"
+    src: 'etc/sssd/sssd.conf.j2'
+    dest: '/etc/sssd/sssd.conf'
+    mode: '0600'
+  notify: restart sssd
+
+- name: pam creates homedirs already?
+  ansible.builtin.command:
+    cmd: /usr/bin/grep "^session.*pam_mkhomedir.so" /etc/pam.d/common-session
+  register: check_mkhomedir
+  ignore_errors: true
+  check_mode: no
+  changed_when: false
+  failed_when: false
+
+- name: configure pam to create homedirs when needed
+  ansible.builtin.command:
+    cmd: /usr/sbin/pam-auth-update --enable mkhomedir
+  when: ( check_mkhomedir.stdout_lines | length ) == 0
+
+- name: configure pam cifs mounts
+  ansible.builtin.lineinfile:
+    path: /etc/security/pam_mount.conf.xml
+    insertafter: '<!-- Volume definitions -->'
+    search_string: '<volume fstype="cifs" server="{{ item.server }}" path="{{ item.path}}" mountpoint="{{ item.mountpoint}}" options="{{ item.options }}" sgrp="{{ item.sgroup }}" />'
+    line: '<volume fstype="cifs" server="{{ item.server }}" path="{{ item.path}}" mountpoint="{{ item.mountpoint}}" options="{{ item.options }}" sgrp="{{ item.sgroup }}" />'
+  loop: '{{ potos_sssd_pam_mount.cifs }}'
