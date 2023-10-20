@@ -28,13 +28,13 @@
   register: check_mkhomedir
   ignore_errors: true
   check_mode: no
-  changed_when: false
-  failed_when: false
+  changed_when: "check_mkhomedir.rc != 0"
+  failed_when: "check_mkhomedir.rc not in [0, 1]"
 
 - name: configure pam to create homedirs when needed
   ansible.builtin.command:
     cmd: /usr/sbin/pam-auth-update --enable mkhomedir
-  when: ( check_mkhomedir.stdout_lines | length ) == 0
+  when: check_mkhomedir.changed
 
 - name: configure pam cifs mounts
   ansible.builtin.lineinfile:
